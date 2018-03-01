@@ -17,10 +17,10 @@ public class GameBoard : MonoBehaviour {
 
     private Slot[] boardSlots = new Slot[15];
 
-    public GameObject[] slotIndicators = new GameObject[15];
-    public Peg[] pegs = new Peg[14];
+    public Peg[] pegs = new Peg[15];
 
     private Peg currentPeg;
+    private Peg jumpedPeg;
 
     public enum Directions
     {
@@ -79,72 +79,93 @@ public class GameBoard : MonoBehaviour {
                 boardSlots[i].moveDict[Directions.LEFT] = true;
             }
 
-            //NOTE: Getting objects with tag returns them in reversed order, subtract by 14 for correct indexing
-            boardSlots[i].indicator = slotIndicators[14 - i];
+            boardSlots[i].indicator = GameObject.Find("SlotIndicator (" + i + ")");
+            if(boardSlots[i].indicator == null)
+            {
+                Debug.LogWarning("Slot indicator " + i + " is misnamed or missing in the hierarchy.");
+            }
         }
 
         for (int i = 0; i < pegs.Length; ++i)
         {
-            pegs[i].availableDirDict = boardSlots[i + 1].moveDict;
-        }
-
-        if (slotIndicators[slotIndicators.Length - 1] == null)
-        {
-            Debug.LogWarning("SlotIndicators array has not been filled in the editor.");
+            if (pegs[i] != null)
+            {
+                pegs[i].availableDirDict = boardSlots[i].moveDict;
+                pegs[i].row = boardSlots[i].row;
+            }
         }
 
         if (pegs[pegs.Length - 1] == null)
         {
             Debug.LogWarning("Peg array has not been filled in the editor.");
         }
-        
-
     }
 
-    private void DeselectAllPegs()
+    private int GetTargetFromDirection(int startIndex, Directions dir)
     {
-        for (int i = 0; i < pegs.Length; ++i)
+        if (startIndex < 0)
         {
-            pegs[i].selected = false;
+            Debug.LogWarning("Cannot find target from negative index.");
+            return -1;
         }
+
+        int ro = boardSlots[startIndex].row;
+        switch (dir)
+        {
+            case Directions.UP_RIGHT:
+                return startIndex - ((ro - 1) + ro - 2);
+            case Directions.RIGHT:
+                return startIndex + 2;
+            case Directions.DOWN_RIGHT:
+                return startIndex + ((ro + 1) + ro + 2);
+            case Directions.DOWN_LEFT:
+                return startIndex + ((2 * ro) + 1);
+            case Directions.LEFT:
+                return startIndex - 2;
+            case Directions.UP_LEFT:
+                return startIndex - ((2 * ro) - 1);
+            default:
+                Debug.Log("No usable direction given");
+                break;
+        }
+        return -1;
     }
 
-    private Directions GetDirection(SlotIndicator targetSlot)
+    private Directions GetDirectionTowardsTarget(SlotIndicator targetSlot)
     {
-        //TODO: fix this garbage
-
-        int currentPegRow = boardSlots[currentPeg.currentIndex].row;
-
         if (currentPeg != null)
         {
-            if (currentPeg.currentIndex > targetSlot.slotIndex)
+            int currentIndex = currentPeg.currentIndex;
+            int currentRow = currentPeg.row;
+
+            if (currentIndex > targetSlot.slotIndex)
             {
-                if (currentPeg.currentIndex - targetSlot.slotIndex == 2)
+                if (currentIndex - ((currentRow - 1) + currentRow - 2) == targetSlot.slotIndex)
                 {
-                    return Directions.LEFT;
+                    return Directions.UP_RIGHT;
                 }
-                else if (currentPeg.currentIndex - ((2 * currentPegRow) - 1) == targetSlot.slotIndex)
+                if (currentIndex - ((2 * currentRow) - 1) == targetSlot.slotIndex)
                 {
                     return Directions.UP_LEFT;
                 }
-                else if (currentPeg.currentIndex - ((currentPegRow  - 1) + currentPegRow - 2) == targetSlot.slotIndex)
+                if (currentIndex - targetSlot.slotIndex == 2)
                 {
-                    return Directions.UP_RIGHT;
+                    return Directions.LEFT;
                 }
             }
             else
             {
-                if (currentPeg.currentIndex + 2 == targetSlot.slotIndex)
-                {
-                    return Directions.RIGHT;
-                }
-                else if(currentPeg.currentIndex + ((currentPegRow + 1) + currentPegRow + 2) == targetSlot.slotIndex)
+                if (currentIndex + ((currentRow + 1) + currentRow + 2) == targetSlot.slotIndex)
                 {
                     return Directions.DOWN_RIGHT;
                 }
-                else if (currentPeg.currentIndex + ((2 * currentPegRow) + 1) == targetSlot.slotIndex)
+                if (currentIndex + ((2 * currentRow) + 1) == targetSlot.slotIndex)
                 {
                     return Directions.DOWN_LEFT;
+                }
+                if (currentIndex + 2 == targetSlot.slotIndex)
+                {
+                    return Directions.RIGHT;
                 }
             }
 
@@ -153,21 +174,68 @@ public class GameBoard : MonoBehaviour {
         }
         else
         {
-            Debug.LogError("Peg is never assigned");
+            Debug.Log("Peg is never assigned");
             return Directions.NONE;
         }
             
     }
 
-    public void UpdatePegDirections()
+    public bool PegHasNeighbor(int pegIndex, Directions dir)
     {
-        //TODO: implement checking for neighbors, and updating directional options
+        int ro = pegs[pegIndex].row;
+        if (dir == Directions.UP_RIGHT)
+        {
+            if (pegs[(pegIndex - ro) + 1] != null)
+            {
+                jumpedPeg = pegs[(pegIndex - ro) + 1];
+                return true;
+            }
+        }
+        if (dir == Directions.UP_LEFT)
+        {
+            if (pegs[pegIndex - (ro)] != null)
+            {
+                jumpedPeg = pegs[pegIndex - (ro)];
+                return true;
+            }
+        }
+        if (dir == Directions.DOWN_LEFT)
+        {
+            if (pegs[pegIndex + (ro)] != null)
+            {
+                jumpedPeg = pegs[pegIndex + (ro)];
+                return true;
+            }
+        }
+        if (dir == Directions.DOWN_RIGHT)
+        {
+            if (pegs[pegIndex + (ro + 1)] != null)
+            {
+                jumpedPeg = pegs[pegIndex + (ro + 1)];
+                return true;
+            }
+        }
+        if (dir == Directions.LEFT)
+        {
+            if (pegs[pegIndex - 1] != null && pegs[pegIndex - 1].row == ro)
+            {
+                jumpedPeg = pegs[pegIndex - 1];
+                return true;
+            }
+        }
+        if (dir == Directions.RIGHT)
+        {
+            if (pegs[pegIndex + 1] != null && pegs[pegIndex + 1].row == ro)
+            {
+                jumpedPeg = pegs[pegIndex + 1];
+                return true;
+            }
+        }
+        return false;
     }
 
-    private void MovePeg(int slotIndex, Directions dir)
+    private void MovePeg(int targetIndex, Directions dir)
     {
-        Debug.Log(slotIndex);
-        Debug.Log(dir);
         bool canMoveInDir;
 
         if (currentPeg != null)
@@ -176,13 +244,24 @@ public class GameBoard : MonoBehaviour {
             {
                 if (canMoveInDir)
                 {
-                    if (!boardSlots[slotIndex].isFilled)
+                    if (!boardSlots[targetIndex].isFilled)
                     {
-                        currentPeg.transform.position = slotIndicators[slotIndex].transform.position;
-                        boardSlots[currentPeg.currentIndex].isFilled = false;
-                        boardSlots[slotIndex].isFilled = true;
-                        currentPeg.currentIndex = slotIndex;
-                        currentPeg.availableDirDict = boardSlots[slotIndex].moveDict;
+                        if (PegHasNeighbor(currentPeg.currentIndex, dir))
+                        {
+                            currentPeg.transform.position = boardSlots[targetIndex].indicator.transform.position;
+                            boardSlots[currentPeg.currentIndex].isFilled = false;
+                            boardSlots[targetIndex].isFilled = true;
+                            pegs[currentPeg.currentIndex] = null;
+
+                            currentPeg.currentIndex = targetIndex;
+                            currentPeg.row = boardSlots[targetIndex].row;
+                            currentPeg.availableDirDict = boardSlots[targetIndex].moveDict;
+
+                            boardSlots[jumpedPeg.currentIndex].isFilled = false;
+                            pegs[jumpedPeg.currentIndex] = null;
+                            pegs[targetIndex] = currentPeg;
+                            Destroy(jumpedPeg.gameObject);
+                        }
                     }
                 }
             }
@@ -193,6 +272,70 @@ public class GameBoard : MonoBehaviour {
         }
     }
 
+    private bool MovesExist()
+    {
+        for (int i = 0; i < pegs.Length; ++i)
+        {
+            if (pegs[i] == null)
+            {
+                continue;
+            }
+            else
+            {
+                bool uLeft = pegs[i].availableDirDict[Directions.UP_LEFT] == true;
+                bool uRight = pegs[i].availableDirDict[Directions.UP_RIGHT] == true;
+                bool dLeft = pegs[i].availableDirDict[Directions.DOWN_LEFT] == true;
+                bool dRight = pegs[i].availableDirDict[Directions.DOWN_RIGHT] == true;
+                bool left = pegs[i].availableDirDict[Directions.LEFT] == true;
+                bool right = pegs[i].availableDirDict[Directions.RIGHT] == true;
+
+                if (uLeft)
+                {
+                    if(PegHasNeighbor(pegs[i].currentIndex, Directions.UP_LEFT) && !boardSlots[GetTargetFromDirection(i, Directions.UP_LEFT)].isFilled)
+                    {
+                        return true;
+                    }
+                }
+                if (uRight)
+                {
+                    if (PegHasNeighbor(pegs[i].currentIndex, Directions.UP_RIGHT) && !boardSlots[GetTargetFromDirection(i, Directions.UP_RIGHT)].isFilled)
+                    {
+                        return true;
+                    }
+                }
+                if (dLeft)
+                {
+                    if (PegHasNeighbor(pegs[i].currentIndex, Directions.DOWN_LEFT) && !boardSlots[GetTargetFromDirection(i, Directions.DOWN_LEFT)].isFilled)
+                    {
+                        return true;
+                    }
+                }
+                if (dRight)
+                {
+                    if(PegHasNeighbor(pegs[i].currentIndex, Directions.DOWN_RIGHT) && !boardSlots[GetTargetFromDirection(i, Directions.DOWN_RIGHT)].isFilled)
+                    {
+                        return true;
+                    }
+                }
+                if (left)
+                {
+                    if(PegHasNeighbor(pegs[i].currentIndex, Directions.LEFT) && !boardSlots[i - 2].isFilled && (boardSlots[i - 2].row == pegs[i].row))
+                    {
+                        return true;
+                    }
+                }
+                if (right)
+                {
+                    if(PegHasNeighbor(pegs[i].currentIndex, Directions.RIGHT) && !boardSlots[i + 2].isFilled && (boardSlots[i + 2].row == pegs[i].row))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
 	void Update ()
     {
 		if(Input.GetMouseButtonDown(0))
@@ -201,13 +344,9 @@ public class GameBoard : MonoBehaviour {
             RaycastHit hit;
             Physics.Raycast(ray, out hit);
 
-            if (currentPeg == null)
+            if (hit.transform != null && hit.transform.tag == "Peg")
             {
-                if (hit.transform != null && hit.transform.tag == "Peg")
-                {
-                    currentPeg = hit.transform.GetComponent<Peg>();
-                    hit.transform.SendMessage("SelectThisPeg");
-                }
+                currentPeg = hit.transform.GetComponent<Peg>();
             }
             else
             {
@@ -217,11 +356,22 @@ public class GameBoard : MonoBehaviour {
                     Slot s = boardSlots[tempIndicator.slotIndex];
                     if (!s.isFilled)
                     {
-                        MovePeg(tempIndicator.slotIndex, GetDirection(tempIndicator));
+                        MovePeg(tempIndicator.slotIndex, GetDirectionTowardsTarget(tempIndicator));
+                        if (!MovesExist())
+                        {
+                            int remainingPegs = 0;
+                            for (int i = 0; i < pegs.Length; ++i)
+                            {
+                                if (pegs[i] != null)
+                                {
+                                    remainingPegs++;
+                                }
+                            }
+                            Debug.Log("Remaining pegs " + remainingPegs);
+                        }
                     }
                 }
                 currentPeg = null;
-                DeselectAllPegs();
             }
         }
 	}
