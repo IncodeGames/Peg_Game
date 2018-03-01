@@ -5,10 +5,11 @@ using UnityEngine;
 public class Peg : MonoBehaviour {
 
     public int currentIndex;
-
+    public Dictionary<GameBoard.Directions, bool> availableDirDict = new Dictionary<GameBoard.Directions, bool>();
+        
     public bool selected;
 
-    private void SelectThisPeg()
+    public void CheckNeighbors()
     {
         selected = true;
     }

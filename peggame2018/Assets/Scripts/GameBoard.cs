@@ -16,13 +16,13 @@ public class GameBoard : MonoBehaviour {
     }
 
     private Slot[] boardSlots = new Slot[15];
-    private GameObject[] slotIndicators = new GameObject[15];
 
+    public GameObject[] slotIndicators = new GameObject[15];
     public Peg[] pegs = new Peg[14];
 
     private Peg currentPeg;
 
-    private enum Directions
+    public enum Directions
     {
         UP_RIGHT = 1,
         RIGHT = 2,
@@ -30,13 +30,13 @@ public class GameBoard : MonoBehaviour {
         DOWN_LEFT = 4,
         LEFT = 5,
         UP_LEFT = 6,
+        NONE = 7,
     }
 
     private int emptySlotIndex = 0;
 
     void Start ()
     {
-        slotIndicators = GameObject.FindGameObjectsWithTag("Slot");
 
         int rowCounter = 1;
 
@@ -83,6 +83,16 @@ public class GameBoard : MonoBehaviour {
             boardSlots[i].indicator = slotIndicators[14 - i];
         }
 
+        for (int i = 0; i < pegs.Length; ++i)
+        {
+            pegs[i].availableDirDict = boardSlots[i + 1].moveDict;
+        }
+
+        if (slotIndicators[slotIndicators.Length - 1] == null)
+        {
+            Debug.LogWarning("SlotIndicators array has not been filled in the editor.");
+        }
+
         if (pegs[pegs.Length - 1] == null)
         {
             Debug.LogWarning("Peg array has not been filled in the editor.");
@@ -109,15 +119,15 @@ public class GameBoard : MonoBehaviour {
         {
             if (currentPeg.currentIndex > targetSlot.slotIndex)
             {
-                if (currentPeg.currentIndex - targetSlot.slotIndex == 2 && targetSlot.slotIndex != 0)
+                if (currentPeg.currentIndex - targetSlot.slotIndex == 2)
                 {
                     return Directions.LEFT;
                 }
-                else if (currentPeg.currentIndex - targetSlot.slotIndex == currentPegRow)
+                else if (currentPeg.currentIndex - ((2 * currentPegRow) - 1) == targetSlot.slotIndex)
                 {
                     return Directions.UP_LEFT;
                 }
-                else if (currentPeg.currentIndex - targetSlot.slotIndex == currentPegRow - 1)
+                else if (currentPeg.currentIndex - ((currentPegRow  - 1) + currentPegRow - 2) == targetSlot.slotIndex)
                 {
                     return Directions.UP_RIGHT;
                 }
@@ -126,30 +136,58 @@ public class GameBoard : MonoBehaviour {
             {
                 if (currentPeg.currentIndex + 2 == targetSlot.slotIndex)
                 {
-
+                    return Directions.RIGHT;
+                }
+                else if(currentPeg.currentIndex + ((currentPegRow + 1) + currentPegRow + 2) == targetSlot.slotIndex)
+                {
+                    return Directions.DOWN_RIGHT;
+                }
+                else if (currentPeg.currentIndex + ((2 * currentPegRow) + 1) == targetSlot.slotIndex)
+                {
+                    return Directions.DOWN_LEFT;
                 }
             }
-        }
 
-        return Directions.RIGHT;
+            Debug.Log("Invalid direction");
+            return Directions.NONE;
+        }
+        else
+        {
+            Debug.LogError("Peg is never assigned");
+            return Directions.NONE;
+        }
             
     }
 
-    private void Move(int slotIndex, Directions dir)
+    public void UpdatePegDirections()
     {
+        //TODO: implement checking for neighbors, and updating directional options
+    }
+
+    private void MovePeg(int slotIndex, Directions dir)
+    {
+        Debug.Log(slotIndex);
+        Debug.Log(dir);
         bool canMoveInDir;
 
         if (currentPeg != null)
         {
-            if (boardSlots[currentPeg.currentIndex].moveDict.TryGetValue(dir, out canMoveInDir))
+            if (currentPeg.availableDirDict.TryGetValue(dir, out canMoveInDir))
             {
                 if (canMoveInDir)
                 {
                     if (!boardSlots[slotIndex].isFilled)
                     {
                         currentPeg.transform.position = slotIndicators[slotIndex].transform.position;
+                        boardSlots[currentPeg.currentIndex].isFilled = false;
+                        boardSlots[slotIndex].isFilled = true;
+                        currentPeg.currentIndex = slotIndex;
+                        currentPeg.availableDirDict = boardSlots[slotIndex].moveDict;
                     }
                 }
+            }
+            else
+            {
                 Debug.LogWarning("Move dictionary did not contain key for given direction.");
             }
         }
@@ -173,15 +211,17 @@ public class GameBoard : MonoBehaviour {
             }
             else
             {
-                if (hit.transform.tag == "Slot")
+                if (hit.transform != null && hit.transform.tag == "Slot")
                 {
                     SlotIndicator tempIndicator = hit.transform.GetComponent<SlotIndicator>();
                     Slot s = boardSlots[tempIndicator.slotIndex];
                     if (!s.isFilled)
                     {
-                        Move(tempIndicator.slotIndex, GetDirection(tempIndicator));
+                        MovePeg(tempIndicator.slotIndex, GetDirection(tempIndicator));
                     }
                 }
+                currentPeg = null;
+                DeselectAllPegs();
             }
         }
 	}
